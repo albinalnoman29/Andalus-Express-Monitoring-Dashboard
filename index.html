@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Andalus Express Monitoring Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #0f172a;
+            --green: #16a34a;
+            --yellow: #d97706;
+            --red: #dc2626;
+            --primary: #0284c7;
+            --dark-blue: #0f172a;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            background: var(--dark-blue);
+            color: white;
+            padding: 22px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 { margin: 0; font-size: 24px; letter-spacing: 0.5px; text-transform: uppercase; }
+        .header p { margin: 5px 0 0 0; opacity: 0.8; font-size: 13px; }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: bold;
+            margin: 25px 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #cbd5e1;
+            color: #334155;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 14px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-left: 4px solid var(--primary);
+        }
+
+        .card h4 { margin: 0; color: #64748b; font-size: 11px; text-transform: uppercase; }
+        .card .value { font-size: 16px; font-weight: bold; margin: 6px 0; }
+        .card .remaining { font-size: 11px; color: #dc2626; font-weight: 600; margin-bottom: 4px; }
+        .card .status { font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; display: inline-block; color: white; }
+
+        .bg-green { background-color: var(--green); }
+        .bg-yellow { background-color: var(--yellow); }
+        .bg-red { background-color: var(--red); }
+
+        .input-section, .filter-section, .config-section {
+            background: var(--card-bg);
+            padding: 18px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569; }
+        .form-group input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+        
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .btn { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .btn-excel { background: #15803d; }
+        .btn-pdf { background: #b91c1c; }
+        .btn-share { background: #25d366; }
+        .btn-view { background: #0284c7; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-edit { background: #d97706; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-del { background: var(--red); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn:hover, .btn-view:hover, .btn-edit:hover, .btn-del:hover { opacity: 0.85; }
+
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            overflow-x: auto;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+        th { background: #f8fafc; color: #475569; font-weight: bold; }
+
+        .tag { padding: 3px 8px; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1; font-size: 11px; margin-right: 5px; margin-bottom: 5px; display: inline-flex; align-items: center; gap: 6px; }
+
+        .chart-box {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        /* MODAL STYLES */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); display: none; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal {
+            background: white; padding: 20px; border-radius: 12px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 12px; }
+        .modal-header h3 { margin: 0; font-size: 15px; color: #0f172a; }
+        .close-btn { cursor: pointer; font-size: 18px; font-weight: bold; color: #64748b; }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .input-section, .filter-section, .config-section, .btn-group, .btn-view, .btn-edit, .btn-del, .header p { display: none !important; }
+            .card { border: 1px solid #ccc; box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Andalus Express Monitoring Dashboard</h1>
+        <p>Target vs Achievement Analytics, Dynamic Slot & Zone Control Panel</p>
+    </div>
+
+    <!-- TARGET SETTINGS PANEL -->
+    <div class="config-section">
+        <h3 style="margin-top:0; font-size: 14px; color: #1e293b;">1. Target Setup Panel</h3>
+        <div class="form-grid">
+            <div class="form-group"><label>Daily Target Orders</label><input type="number" id="tgtDailyOrders"></div>
+            <div class="form-group"><label>Daily Target Sales (SAR)</label><input type="number" id="tgtDailySales"></div>
+            <div class="form-group"><label>Monthly Target Orders</label><input type="number" id="tgtMonthlyOrders"></div>
+            <div class="form-group"><label>Monthly Target Sales (SAR)</label><input type="number" id="tgtMonthlySales"></div>
+            <div class="form-group"><label>Yearly Target Orders</label><input type="number" id="tgtYearlyOrders"></div>
+            <div class="form-group"><label>Yearly Target Sales (SAR)</label><input type="number" id="tgtYearlySales"></div>
+        </div>
+        <button class="btn" onclick="saveTargetSettings()">Save Custom Targets</button>
+    </div>
+
+    <!-- DYNAMIC CONFIGURATION (SLOTS & ZONES CREATOR) -->
+    <div class="config-section">
+        <h3 style="margin-top:0; font-size: 14px; color: #1e293b;">2. Dynamic Delivery Slots & Zones Manager</h3>
+        <div class="form-grid">
+            <div class="form-group" style="grid-column: span 2;">
+                <label>Add Delivery Slot Name</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="newSlotName" placeholder="e.g. Slot 1 (08 AM-10 AM)" style="flex:1;">
+                    <button class="btn" onclick="addSlot()">+ Add Slot</button>
+                </div>
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+                <label>Add Distance Zone Name</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="newZoneName" placeholder="e.g. ZONE 1 — 0-10 KM" style="flex:1;">
+                    <button class="btn" style="background:#475569" onclick="addZone()">+ Add Zone</button>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 12px;">
+            <b style="font-size: 12px;">Active Slots:</b> <div id="activeSlotsList" style="margin-top: 5px;"></div>
+        </div>
+        <div style="margin-top: 10px;">
+            <b style="font-size: 12px;">Active Zones:</b> <div id="activeZonesList" style="margin-top: 5px;"></div>
+        </div>
+    </div>
+
+    <!-- DAILY DATA ENTRY FORM -->
+    <div class="input-section">
+        <h3 style="margin-top:0; font-size: 14px; color: #1e293b;">3. Daily E-Commerce Order Entry & Distribution</h3>
+        
+        <div class="form-grid">
+            <div class="form-group"><label>Date</label><input type="date" id="entryDate"></div>
+            <div class="form-group"><label>Today Total Orders</label><input type="number" id="todayTotalOrders" placeholder="e.g. 120"></div>
+            <div class="form-group"><label>Today Actual Sales (SAR)</label><input type="number" id="actualSales" placeholder="e.g. 9000"></div>
+            <div class="form-group"><label>New Customers Order</label><input type="number" id="newCust" placeholder="0"></div>
+            <div class="form-group"><label>Old Customers Order</label><input type="number" id="oldCust" placeholder="0"></div>
+        </div>
+
+        <div style="font-size: 11px; font-weight: bold; color: #0284c7; margin: 15px 0 5px 0;">DISTRIBUTE ORDERS INTO SLOTS</div>
+        <div class="form-grid" id="slotsContainer"></div>
+
+        <div style="font-size: 11px; font-weight: bold; color: #0284c7; margin: 15px 0 5px 0;">DISTRIBUTE ORDERS INTO ZONES</div>
+        <div class="form-grid" id="zonesContainer"></div>
+
+        <div class="btn-group">
+            <button class="btn" onclick="saveData()">Validate & Save Record</button>
+        </div>
+    </div>
+
+    <!-- TARGET VS ACHIEVEMENT: MAIN DASHBOARD -->
+    <div class="section-title">4. TARGET VS ACHIEVEMENT ANALYTICS</div>
+    <div class="grid">
+        <div class="card">
+            <h4>Orders / Day</h4>
+            <div class="value" id="d_ord">0</div>
+            <div class="remaining" id="d_ord_rem">Remaining: 0</div>
+            <span class="status bg-red" id="d_ord_st">0%</span>
+        </div>
+        <div class="card">
+            <h4>Sales / Day</h4>
+            <div class="value" id="d_sal">SAR 0</div>
+            <div class="remaining" id="d_sal_rem">Remaining: SAR 0</div>
+            <span class="status bg-red" id="d_sal_st">0%</span>
+        </div>
+        <div class="card">
+            <h4>Orders / Month</h4>
+            <div class="value" id="m_ord">0</div>
+            <div class="remaining" id="m_ord_rem">Remaining: 0</div>
+            <span class="status bg-red" id="m_ord_st">0%</span>
+        </div>
+        <div class="card">
+            <h4>Sales / Month</h4>
+            <div class="value" id="m_sal">SAR 0</div>
+            <div class="remaining" id="m_sal_rem">Remaining: SAR 0</div>
+            <span class="status bg-red" id="m_sal_st">0%</span>
+        </div>
+        <div class="card">
+            <h4>Orders / Year</h4>
+            <div class="value" id="y_ord">0</div>
+            <div class="remaining" id="y_ord_rem">Remaining: 0</div>
+            <span class="status bg-red" id="y_ord_st">0%</span>
+        </div>
+        <div class="card">
+            <h4>Sales / Year</h4>
+            <div class="value" id="y_sal">SAR 0</div>
+            <div class="remaining" id="y_sal_rem">Remaining: SAR 0</div>
+            <span class="status bg-red" id="y_sal_st">0%</span>
+        </div>
+    </div>
+
+    <!-- REPORT FILTERS & VISUAL CHART -->
+    <div class="section-title">5. ANALYTICS & FILTERED REPORT</div>
+    <div class="filter-section">
+        <div class="form-grid" style="margin-bottom:0;">
+            <div class="form-group"><label>Filter From Date</label><input type="date" id="filterFrom"></div>
+            <div class="form-group"><label>Filter To Date</label><input type="date" id="filterTo"></div>
+            <div class="form-group" style="justify-content: flex-end;">
+                <div class="btn-group">
+                    <button class="btn" style="background:#475569" onclick="loadData()">Apply Filter</button>
+                    <button class="btn btn-pdf" onclick="window.print()">Print / PDF</button>
+                    <button class="btn btn-excel" onclick="exportToExcel()">Export Excel (.CSV)</button>
+                    <button class="btn btn-share" onclick="shareWhatsApp()">Share WhatsApp</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VISUAL CHART -->
+    <div class="chart-box">
+        <canvas id="salesChart" height="80"></canvas>
+    </div>
+
+    <!-- HISTORY TABLE -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Total Orders</th>
+                    <th>Sales (SAR)</th>
+                    <th>AOV</th>
+                    <th>New / Old Cust</th>
+                    <th style="text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="historyTable"></tbody>
+        </table>
+    </div>
+
+    <!-- VIEW DETAILS MODAL -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalDateTitle">Order Breakdown Details</h3>
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('entryDate').valueAsDate = new Date();
+
+        // DEFAULT TARGET VALUES
+        let TGT = JSON.parse(localStorage.getItem('andalusTargets')) || {
+            d_ord: 288, d_sal: 21600,
+            m_ord: 8640, m_sal: 648000,
+            y_ord: 103680, y_sal: 7776000
+        };
+
+        function loadTargetInputs() {
+            document.getElementById('tgtDailyOrders').value = TGT.d_ord;
+            document.getElementById('tgtDailySales').value = TGT.d_sal;
+            document.getElementById('tgtMonthlyOrders').value = TGT.m_ord;
+            document.getElementById('tgtMonthlySales').value = TGT.m_sal;
+            document.getElementById('tgtYearlyOrders').value = TGT.y_ord;
+            document.getElementById('tgtYearlySales').value = TGT.y_sal;
+        }
+
+        function saveTargetSettings() {
+            TGT.d_ord = parseFloat(document.getElementById('tgtDailyOrders').value) || 0;
+            TGT.d_sal = parseFloat(document.getElementById('tgtDailySales').value) || 0;
+            TGT.m_ord = parseFloat(document.getElementById('tgtMonthlyOrders').value) || 0;
+            TGT.m_sal = parseFloat(document.getElementById('tgtMonthlySales').value) || 0;
+            TGT.y_ord = parseFloat(document.getElementById('tgtYearlyOrders').value) || 0;
+            TGT.y_sal = parseFloat(document.getElementById('tgtYearlySales').value) || 0;
+
+            localStorage.setItem('andalusTargets', JSON.stringify(TGT));
+            alert('✅ Target Settings Updated Successfully!');
+            loadData();
+        }
+
+        let masterSlots = JSON.parse(localStorage.getItem('andalusSlots')) || [
+            'Slot 1 (08-10 AM)', 'Slot 2 (10-12 PM)', 'Slot 3 (12-03 PM)', 
+            'Slot 4 (03-06 PM)', 'Slot 5 (06-09 PM)', 'Slot 6 (09-12 AM)'
+        ];
+
+        let masterZones = JSON.parse(localStorage.getItem('andalusZones')) || [
+            'ZONE 1 — 0-10 KM', 'ZONE 2 — 10-20 KM', 'ZONE 3 — 20-30 KM'
+        ];
+
+        let myChart = null;
+
+        function renderConfigUI() {
+            localStorage.setItem('andalusSlots', JSON.stringify(masterSlots));
+            localStorage.setItem('andalusZones', JSON.stringify(masterZones));
+
+            document.getElementById('activeSlotsList').innerHTML = masterSlots.map((s,i) => 
+                `<span class="tag">${s} 
+                    <b style="cursor:pointer;color:#d97706;" onclick="editSlot(${i})">✏️</b>
+                    <b style="cursor:pointer;color:red;" onclick="removeSlot(${i})">×</b>
+                </span>`
+            ).join('');
+
+            document.getElementById('activeZonesList').innerHTML = masterZones.map((z,i) => 
+                `<span class="tag">${z} 
+                    <b style="cursor:pointer;color:#d97706;" onclick="editZone(${i})">✏️</b>
+                    <b style="cursor:pointer;color:red;" onclick="removeZone(${i})">×</b>
+                </span>`
+            ).join('');
+
+            const slotsCont = document.getElementById('slotsContainer');
+            slotsCont.innerHTML = masterSlots.map((s, idx) => `<div class="form-group"><label>${s}</label><input type="number" id="slot_val_${idx}" placeholder="0"></div>`).join('');
+
+            const zonesCont = document.getElementById('zonesContainer');
+            zonesCont.innerHTML = masterZones.map((z, idx) => `<div class="form-group"><label>${z}</label><input type="number" id="zone_val_${idx}" placeholder="0"></div>`).join('');
+        }
+
+        function addSlot() {
+            const val = document.getElementById('newSlotName').value.trim();
+            if(val) { masterSlots.push(val); document.getElementById('newSlotName').value = ''; renderConfigUI(); }
+        }
+
+        function editSlot(idx) {
+            const updatedName = prompt("Edit Slot Name:", masterSlots[idx]);
+            if(updatedName && updatedName.trim() !== "") {
+                masterSlots[idx] = updatedName.trim();
+                renderConfigUI();
+            }
+        }
+
+        function removeSlot(idx) {
+            if(confirm('Delete this slot?')) { masterSlots.splice(idx,1); renderConfigUI(); }
+        }
+
+        function addZone() {
+            const val = document.getElementById('newZoneName').value.trim();
+            if(val) { masterZones.push(val); document.getElementById('newZoneName').value = ''; renderConfigUI(); }
+        }
+
+        function editZone(idx) {
+            const updatedName = prompt("Edit Zone Name:", masterZones[idx]);
+            if(updatedName && updatedName.trim() !== "") {
+                masterZones[idx] = updatedName.trim();
+                renderConfigUI();
+            }
+        }
+
+        function removeZone(idx) {
+            if(confirm('Delete this zone?')) { masterZones.splice(idx,1); renderConfigUI(); }
+        }
+
+        function saveData() {
+            const date = document.getElementById('entryDate').value;
+            const targetTotalOrders = parseFloat(document.getElementById('todayTotalOrders').value) || 0;
+            const sales = parseFloat(document.getElementById('actualSales').value) || 0;
+            const newCust = parseFloat(document.getElementById('newCust').value) || 0;
+            const oldCust = parseFloat(document.getElementById('oldCust').value) || 0;
+
+            if (!date) return alert('Select date!');
+            if (targetTotalOrders <= 0) return alert('Please input Today Total Orders!');
+
+            if ((newCust + oldCust) !== targetTotalOrders) {
+                return alert(`⚠️ MISMATCH ERROR!\nNew Customer (${newCust}) + Old Customer (${oldCust}) = ${newCust + oldCust}.\nMust equal Total Orders (${targetTotalOrders}). Not Saved!`);
+            }
+
+            let slotsData = {};
+            let totalSlotOrders = 0;
+            masterSlots.forEach((s, idx) => {
+                const val = parseFloat(document.getElementById(`slot_val_${idx}`).value) || 0;
+                slotsData[s] = val;
+                totalSlotOrders += val;
+            });
+
+            if (totalSlotOrders !== targetTotalOrders) {
+                return alert(`⚠️ SLOT ERROR!\nTotal Slot Orders sum is ${totalSlotOrders}, but Total Orders is ${targetTotalOrders}.\nNot Saved!`);
+            }
+
+            let zonesData = {};
+            let totalZoneOrders = 0;
+            masterZones.forEach((z, idx) => {
+                const val = parseFloat(document.getElementById(`zone_val_${idx}`).value) || 0;
+                zonesData[z] = val;
+                totalZoneOrders += val;
+            });
+
+            if (totalZoneOrders !== targetTotalOrders) {
+                return alert(`⚠️ ZONE ERROR!\nTotal Zone Orders sum is ${totalZoneOrders}, but Total Orders is ${targetTotalOrders}.\nNot Saved!`);
+            }
+
+            let data = JSON.parse(localStorage.getItem('andalusDynamicData')) || [];
+            data = data.filter(item => item.date !== date);
+            
+            data.unshift({ date, targetTotalOrders, sales, newCust, oldCust, slotsData, zonesData });
+
+            localStorage.setItem('andalusDynamicData', JSON.stringify(data));
+            alert('✅ Record Successfully Saved!');
+            resetInputs();
+            loadData();
+        }
+
+        function resetInputs() {
+            document.getElementById('todayTotalOrders').value = '';
+            document.getElementById('actualSales').value = '';
+            document.getElementById('newCust').value = '';
+            document.getElementById('oldCust').value = '';
+            masterSlots.forEach((_, idx) => document.getElementById(`slot_val_${idx}`).value = '');
+            masterZones.forEach((_, idx) => document.getElementById(`zone_val_${idx}`).value = '');
+            document.getElementById('entryDate').valueAsDate = new Date();
+        }
+
+        function loadData() {
+            const data = JSON.parse(localStorage.getItem('andalusDynamicData')) || [];
+            const fromDate = document.getElementById('filterFrom').value;
+            const toDate = document.getElementById('filterTo').value;
+
+            let filtered = data;
+            if (fromDate && toDate) {
+                filtered = data.filter(item => item.date >= fromDate && item.date <= toDate);
+            }
+
+            const tableBody = document.getElementById('historyTable');
+            tableBody.innerHTML = '';
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const currentYear = new Date().getFullYear().toString();
+
+            let today = { ord: 0, sal: 0 };
+            let month = { ord: 0, sal: 0 };
+            let year = { ord: 0, sal: 0 };
+
+            let chartDates = [];
+            let chartSales = [];
+            let chartOrders = [];
+
+            filtered.forEach((item) => {
+                if (item.date === todayStr) { today.ord += item.targetTotalOrders; today.sal += item.sales; }
+                if (item.date.slice(0, 7) === currentMonth) { month.ord += item.targetTotalOrders; month.sal += item.sales; }
+                if (item.date.slice(0, 4) === currentYear) { year.ord += item.targetTotalOrders; year.sal += item.sales; }
+
+                const aov = item.targetTotalOrders > 0 ? (item.sales / item.targetTotalOrders).toFixed(1) : 0;
+
+                tableBody.innerHTML += `<tr>
+                    <td><b>${item.date}</b></td>
+                    <td><b>${item.targetTotalOrders}</b></td>
+                    <td>SAR ${item.sales.toLocaleString()}</td>
+                    <td>SAR ${aov}</td>
+                    <td>${item.newCust} / ${item.oldCust}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-view" onclick="viewDetails('${item.date}')">View</button>
+                        <button class="btn-edit" onclick="editData('${item.date}')">Edit</button>
+                        <button class="btn-del" onclick="deleteData('${item.date}')">Delete</button>
+                    </td>
+                </tr>`;
+
+                chartDates.push(item.date);
+                chartSales.push(item.sales);
+                chartOrders.push(item.targetTotalOrders);
+            });
+
+            updateStat('d_ord', today.ord, TGT.d_ord);
+            updateStat('d_sal', today.sal, TGT.d_sal, true);
+            updateStat('m_ord', month.ord, TGT.m_ord);
+            updateStat('m_sal', month.sal, TGT.m_sal, true);
+            updateStat('y_ord', year.ord, TGT.y_ord);
+            updateStat('y_sal', year.sal, TGT.y_sal, true);
+
+            renderChart(chartDates.reverse(), chartSales.reverse(), chartOrders.reverse());
+        }
+
+        function updateStat(id, act, tgt, isCurrency = false) {
+            const pct = tgt > 0 ? ((act / tgt) * 100).toFixed(1) : 0;
+            const remaining = tgt - act > 0 ? tgt - act : 0;
+
+            document.getElementById(id).innerText = (isCurrency ? 'SAR ' : '') + act.toLocaleString();
+            document.getElementById(id + '_rem').innerText = `Remaining: ${isCurrency ? 'SAR ' : ''}${remaining.toLocaleString()}`;
+            
+            const elSt = document.getElementById(id + '_st');
+            elSt.innerText = pct + '% Achieved';
+            elSt.classList.remove('bg-green', 'bg-yellow', 'bg-red');
+            if (pct >= 100) elSt.classList.add('bg-green');
+            else if (pct >= 80) elSt.classList.add('bg-yellow');
+            else elSt.classList.add('bg-red');
+        }
+
+        function viewDetails(dateStr) {
+            const data = JSON.parse(localStorage.getItem('andalusDynamicData')) || [];
+            const item = data.find(i => i.date === dateStr);
+            if (!item) return;
+
+            document.getElementById('modalDateTitle').innerText = `Breakdown Details for Date: ${item.date}`;
+            
+            let slotHtml = Object.entries(item.slotsData).map(([k,v]) => `<li><b>${k}:</b> ${v} Orders</li>`).join('');
+            let zoneHtml = Object.entries(item.zonesData).map(([k,v]) => `<li><b>${k}:</b> ${v} Orders</li>`).join('');
+
+            document.getElementById('modalBody').innerHTML = `
+                <p><b>Total Orders:</b> ${item.targetTotalOrders}</p>
+                <p><b>Total Sales:</b> SAR ${item.sales.toLocaleString()}</p>
+                <p><b>New / Old Customers:</b> ${item.newCust} New / ${item.oldCust} Old</p>
+                <hr>
+                <h4 style="margin:5px 0; color:#0284c7;">Slot Distribution:</h4>
+                <ul style="padding-left: 20px; font-size: 12px;">${slotHtml}</ul>
+                <h4 style="margin:5px 0; color:#0284c7;">Zone Distribution:</h4>
+                <ul style="padding-left: 20px; font-size: 12px;">${zoneHtml}</ul>
+            `;
+
+            document.getElementById('viewModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('viewModal').style.display = 'none';
+        }
+
+        function renderChart(labels, salesData, ordersData) {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            if (myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Sales (SAR)', data: salesData, borderColor: '#0284c7', backgroundColor: 'rgba(2,132,199,0.1)', fill: true, yAxisID: 'y' },
+                        { label: 'Orders', data: ordersData, borderColor: '#16a34a', backgroundColor: 'transparent', yAxisID: 'y1' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { type: 'linear', position: 'left', title: { display: true, text: 'Sales (SAR)' } },
+                        y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Orders' } }
+                    }
+                }
+            });
+        }
+
+        function editData(dateStr) {
+            const data = JSON.parse(localStorage.getItem('andalusDynamicData')) || [];
+            const item = data.find(i => i.date === dateStr);
+            if (!item) return;
+
+            document.getElementById('entryDate').value = item.date;
+            document.getElementById('todayTotalOrders').value = item.targetTotalOrders;
+            document.getElementById('actualSales').value = item.sales;
+            document.getElementById('newCust').value = item.newCust;
+            document.getElementById('oldCust').value = item.oldCust;
+
+            masterSlots.forEach((s, idx) => {
+                document.getElementById(`slot_val_${idx}`).value = item.slotsData[s] || 0;
+            });
+
+            masterZones.forEach((z, idx) => {
+                document.getElementById(`zone_val_${idx}`).value = item.zonesData[z] || 0;
+            });
+
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+        }
+
+        function deleteData(dateStr) {
+            if (confirm(`Are you sure you want to delete the record for ${dateStr}?`)) {
+                if (confirm(`⚠️ FINAL WARNING: This action cannot be undone! Delete record for ${dateStr}?`)) {
+                    let data = JSON.parse(localStorage.getItem('andalusDynamicData')) || [];
+                    data = data.filter(i => i.date !== dateStr);
+                    localStorage.setItem('andalusDynamicData', JSON.stringify(data));
+                    loadData();
+                    alert("Record deleted successfully.");
+                }
+            }
+        }
+
+        function exportToExcel() {
+            const data = JSON.parse(localStorage.getItem('andalusDynamicData')) || [];
+            if (data.length === 0) return alert('No data available!');
+
+            let slotHeaders = masterSlots.join(",");
+            let zoneHeaders = masterZones.join(",");
+            let csv = `Date,Total_Orders,Sales_SAR,New_Cust,Old_Cust,${slotHeaders},${zoneHeaders}\n`;
+
+            data.forEach(r => {
+                let slotValues = masterSlots.map(s => r.slotsData ? (r.slotsData[s] || 0) : 0).join(",");
+                let zoneValues = masterZones.map(z => r.zonesData ? (r.zonesData[z] || 0) : 0).join(",");
+                csv += `${r.date},${r.targetTotalOrders},${r.sales},${r.newCust},${r.oldCust},${slotValues},${zoneValues}\n`;
+            });
+
+            const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Andalus_Express_Monitoring_Report.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function shareWhatsApp() {
+            const data = JSON.parse(localStorage.getItem('andalusDynamicData')) || [];
+            const todayStr = new Date().toISOString().split('T')[0];
+            const today = data.find(i => i.date === todayStr) || { targetTotalOrders: 0, sales: 0 };
+
+            const text = `*ANDALUS EXPRESS MONITORING REPORT (${todayStr})*%0A- Total Orders: ${today.targetTotalOrders}%0A- Total Sales: SAR ${today.sales.toLocaleString()}`;
+            window.open(`https://wa.me/?text=${text}`, '_blank');
+        }
+
+        loadTargetInputs();
+        renderConfigUI();
+        loadData();
+    </script>
+</body>
+</html>
